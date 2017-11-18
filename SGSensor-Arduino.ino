@@ -69,7 +69,7 @@ tempRaw = analogRead(tempPin);
   tempCel = (( tempRaw/1024.0)*5000)/10; 
   tempFar = (tempCel*9)/5 + 32;
   
-if (logCount = 600000){
+if (logCount == 27280){
   
  dataFile = SD.open("data.txt", FILE_WRITE);
  dataFile.println(logNum);
@@ -95,7 +95,7 @@ if (specificGravity < 1)
 }
 else
 {
-lcd.print(specificGravity, 3);
+  lcd.print(specificGravity, 3);
 }
 
 lcd.print("  ");
