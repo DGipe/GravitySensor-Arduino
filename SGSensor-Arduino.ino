@@ -1,5 +1,5 @@
 /*
-* Ulstrasonic Sensor - ECE4600
+* Ultrasonic Sensor - ECE4810
 *
 * Bench Test - V 1.2
 * 
@@ -18,10 +18,10 @@ File dataFile;
 
 //Variables
   //Pins
-  const int trigPin = 9;
-  const int csPin = 53; 
-  const int echoPin = 10;
-  const int tempPin = 1;
+  const int trigPin = 9; //Ultrasonic trigger
+  const int echoPin = 10; //Ultrasonic Echo
+  const int csPin = 53; //SD Card pin
+  const int tempPin = 1; //LM35 input
 
   //Specific Gravity
   long duration;
@@ -63,14 +63,15 @@ tempRaw = analogRead(tempPin);
 //Calculations
   //Gravity
   durationRaw = duration;
-  specificGravity = .0003333*duration+.645;
+  specificGravity = .0003333*duration+.645;  //Equation from Y-intercept of two reading
 
   //Temp
-  tempCel = (( tempRaw/1024.0)*5000)/10; 
-  tempFar = (tempCel*9)/5 + 32;
+  tempCel = (( tempRaw/1024.0)*5000)/10;  //Obtained from internet, standard for LM35
+  tempFar = (tempCel*9)/5 + 32; //Standard C to F conversion
   
-if (logCount == 27280){
-  
+if (logCount == 27280) //Only write to SD card every 10min
+
+{
  dataFile = SD.open("data.txt", FILE_WRITE);
  dataFile.println(logNum);
  dataFile.print("Raw delay time: ");
@@ -82,22 +83,13 @@ if (logCount == 27280){
  dataFile.println();
  dataFile.close(); 
 
- logCount = 0;
+ logCount = 0; //reset "timer"
  logNum++;
 }
 
 lcd.setCursor(0,0); 
 lcd.print("SG: ");
-
-if (specificGravity < 1)
-{
-  lcd.print("Error");
-}
-else
-{
-  lcd.print(specificGravity, 3);
-}
-
+lcd.print(specificGravity, 3);
 lcd.print("  ");
 lcd.print(durationRaw); 
 lcd.setCursor(0,1);
