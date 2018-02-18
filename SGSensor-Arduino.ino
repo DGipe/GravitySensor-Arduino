@@ -1,32 +1,31 @@
 /*
 * Ultrasonic Sensor - ECE4810
 *
-* Bench Test - V 1.2
+* Bench Test - V 2.0
 * 
 * David Gipe
 */
 
-//LCD
-#include <LiquidCrystal.h> 
-LiquidCrystal lcd(1, 2, 4, 5, 6, 7); 
-
 //SD Card
 #include <SD.h>
 #include <SPI.h>
+
+#include <PulseInOne.h> //Sets to listen on INT1
 File dataFile;
 
 
 //Variables
   //Pins
-  const int trigPin = 9; //Ultrasonic trigger
-  const int echoPin = 10; //Ultrasonic Echo
+  const int trigPin = 12; //Ultrasonic trigger
   const int csPin = 53; //SD Card pin
   const int tempPin = 1; //LM35 input
 
   //Specific Gravity
-  long duration;
   int durationRaw;
   float specificGravity;
+  unsigned long lastTime  = 0;
+  int pingTimer     = 0;
+  int pingDelay     = 500; // milliseconds between ping pulses
 
   //Temperature
   int tempRaw;
@@ -38,39 +37,38 @@ File dataFile;
   int logNum = 1;
   
 void setup() {
-  
-lcd.begin(16,2); 
-pinMode(trigPin, OUTPUT);
-pinMode(echoPin, INPUT);
 
-SD.begin();
-pinMode(csPin, OUTPUT);
+  Serial.begin(9600);
 
+  pinMode(trigPin, OUTPUT);
+  digitalWrite(trigPin, LOW);
+
+  PulseInOne::setup(pingReturn);
+
+  SD.begin();
+  pinMode(csPin, OUTPUT);
 }
 
 void loop() {
 
-//Sensor Read  
-digitalWrite(trigPin, LOW);
-delayMicroseconds(2);
-digitalWrite(trigPin, HIGH);
-delayMicroseconds(10);
-digitalWrite(trigPin, LOW);
-duration = pulseIn(echoPin, HIGH);
+  unsigned long time = millis();
+  unsigned long dt   = time - lastTime;
+  lastTime = time;
+  
+  pingTimer += dt;
+  if(pingTimer > pingDelay){  
+  pingTimer = 0;
+  ping();
+  } 
 
-tempRaw = analogRead(tempPin);
+  tempRaw = analogRead(tempPin);
 
 //Calculations
-  //Gravity
-  durationRaw = duration;
-  specificGravity = .0003333*duration+.645;  //Equation from Y-intercept of two reading
-
-  //Temp
-  tempCel = (( tempRaw/1024.0)*5000)/10;  //Obtained from internet, standard for LM35
-  tempFar = (tempCel*9)/5 + 32; //Standard C to F conversion
-  
+ //Temp
+ tempCel = (( tempRaw/1024.0)*5000)/10;  //Obtained from internet, standard for LM35
+ tempFar = (tempCel*9)/5 + 32; //Standard C to F conversion
+    
 if (logCount == 27280) //Only write to SD card every 10min
-
 {
  dataFile = SD.open("data.txt", FILE_WRITE);
  dataFile.println(logNum);
@@ -83,20 +81,36 @@ if (logCount == 27280) //Only write to SD card every 10min
  dataFile.println();
  dataFile.close(); 
 
- logCount = 0; //reset "timer"
- logNum++;
-}
+  logCount = 0; //reset "timer"
+  logNum++;
+  }
 
-lcd.setCursor(0,0); 
-lcd.print("SG: ");
-lcd.print(specificGravity, 3);
-lcd.print("  ");
-lcd.print(durationRaw); 
-lcd.setCursor(0,1);
-lcd.print("Temp: "); 
-lcd.print(tempFar, 1); 
-lcd.print(" F");
 
 logCount++;
-delay(10);
 }
+
+
+void ping(){
+
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  PulseInOne::begin(); //Start listening on INT1
+}
+
+
+void pingReturn(unsigned long duration) {
+
+  durationRaw = duration;
+  specificGravity = .0003333*duration+.645;  //Equation from Y-intercept of two readings
+
+  Serial.print("Raw: ");
+  Serial.print(duration);
+  Serial.print(" us, est. SG: ");
+  Serial.print(specificGravity, 3);
+  Serial.print(" Temp: ");
+  Serial.print(tempFar, 1);
+  Serial.println(" F");  
+}
+
