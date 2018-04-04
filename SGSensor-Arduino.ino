@@ -1,72 +1,109 @@
 /*
-* Ultrasonic Sensor - ECE4810
+* Ultrasonic Sensor - ECE4820
 *
-* Bench Test - V 2.1
+* Bench Test - V 2.2
 * 
+* Brandon Robbins
 * David Gipe
+* Izat Dahger
 */
 
+#include <PulseInOne.h>
 
-#include <PulseInOne.h> //Sets to listen on INT1
+#include <Arduino.h>   // required before wiring_private.h
+#include "wiring_private.h" // pinPeripheral() function
 
 //Variables
-  //Pins
-  const int trigPin = 12; //Ultrasonic trigger
+  //pins
+  
+const int trigPin = 12; //Ultrasonic trigger, echo on pin 1 EXTI 1
   const int tempPin = 2; //LM35 input
-  const int volPin = A1; //Battery Monitoring
-
+  const int voltPin = 1; //Battery Monitoring
+  
+  //status light
+  const int LED = 13;
+  
   //Specific Gravity
+  //attach echo to pin 1/Tx
   int durationRaw;
   float specificGravity;
   unsigned long lastTime  = 0;
   int pingTimer     = 0;
-  int pingDelay     = 500; // milliseconds between ping pulses
+  int pingDelay     = 300; // milliseconds between ping pulses
 
   //Temperature
   int tempRaw;
-  float tempCel;
-  float tempFar;
 
   //Battery Voltage
   float volActual;
 
+
+  //Bluetooth
+  unsigned long previous = 0;        // will store last time
+  Uart Serial2 (&sercom1, 11, 10, SERCOM_RX_PAD_0, UART_TX_PAD_2); //bluetooth Module
+  
+void SERCOM1_Handler()
+{
+  Serial2.IrqHandler();
+}
+ 
 void setup() {
-
   SerialUSB.begin(9600);
-
+  pinMode(LED,OUTPUT);
   pinMode(trigPin, OUTPUT);
   digitalWrite(trigPin, LOW);
 
   PulseInOne::setup(pingReturn);
+ 
+  Serial2.begin(57600); //baud rate for your bluetooth module
+  
+  // Assign pins 10 & 11 SERCOM functionality
+  pinPeripheral(10, PIO_SERCOM); //plug Rx here
+  pinPeripheral(11, PIO_SERCOM); //plug Tx here
 
+  delay(200); // wait for voltage stabilize
+  
+  delay(3000); // wait for settings to take affect. 
+  
 }
+ 
 
 void loop() {
- // SerialUSB.println("Startup Initiated");
-  unsigned long time = millis();
-  unsigned long dt   = time - lastTime;
-  lastTime = time;
+  if (Serial2.available()) { // check if anything in UART buffer
+    if(Serial2.read() == '1'){ // did we receive this character?
+       digitalWrite(13,!digitalRead(13)); // if so, toggle the onboard LED
+    }
+  }
+
+  unsigned long current = millis();
+  unsigned long dt   = current - lastTime;
+  lastTime = current;
   
   pingTimer += dt;
   if(pingTimer > pingDelay){  
-  pingTimer = 0;
-  ping();
+    pingTimer = 0;
+    ping();
   } 
 
-  tempRaw = analogRead(tempPin);
 
-//Calculations - will soon be offloaded to app to compute
- //Temp
- tempCel = (( tempRaw/1024.0)*5000)/10;  //Obtained from internet, standard for LM35
- tempFar = (tempCel*9)/5 + 32; //Standard C to F conversion
-
- //Voltage
- volActual = analogRead(volPin) * (5.0 / 1023.0);
-   
+  current = millis();
+  
+  if (current - previous >= pingDelay) {
+    
+    tempRaw = analogRead(tempPin);
+    volActual = analogRead(voltPin);
+    
+    previous = current;
+    //for distance test use durationRaw = durationRaw/29/2;
+    String data = String(durationRaw) + "," + String(tempRaw) + "," + String(volActual);
+    Serial2.print(data); // print this to bluetooth module
+    SerialUSB.println(data);
+  }
+  
 }
 
-
 void ping(){
+
 
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
@@ -75,20 +112,6 @@ void ping(){
   PulseInOne::begin(); //Start listening on INT1
 }
 
-
 void pingReturn(unsigned long duration) {
-
   durationRaw = duration;
-  specificGravity = .0003333*duration+.645;  //Equation from Y-intercept of two readings, arbirtrary
-
-  SerialUSB.print("Raw: ");
-  SerialUSB.print(duration);
-  SerialUSB.print(" us, est. SG: ");
-  SerialUSB.print(specificGravity, 3);
-  SerialUSB.print(" Temp: ");
-  SerialUSB.print(tempFar, 1);
-  SerialUSB.print(" F ");
-  SerialUSB.print(volActual);
-  SerialUSB.println(" V");   
 }
-
