@@ -1,14 +1,12 @@
 /*
 * Ultrasonic Sensor - ECE4820
 *
-* Bench Test - V 2.2
+* Bench Test - V 3.0
 * 
 * Brandon Robbins
 * David Gipe
 * Izat Dahger
 */
-
-#include <PulseInOne.h>
 
 #include <Arduino.h>   // required before wiring_private.h
 #include "wiring_private.h" // pinPeripheral() function
@@ -16,26 +14,22 @@
 //Variables
   //pins
   
-const int trigPin = 12; //Ultrasonic trigger, echo on pin 1 EXTI 1
+  const int trigPin = 12; //Ultrasonic trigger, echo on pin 1 EXTI 1
   const int tempPin = 2; //LM35 input
   const int voltPin = 1; //Battery Monitoring
-
-  const int pulsePin = 9;
+  const int pulsePin = 9; //Un-processed input from RX of sensor
   
   //status light
   const int LED = 13;
   
   //Specific Gravity
-  //attach echo to pin 1/Tx
-  int durationRaw;
+
   float specificGravity;
   unsigned long lastTime  = 0;
   int pingTimer     = 0;
-  int pingDelay     = 300; // milliseconds between ping pulses
-  
-  int pulseState = 0;
-  int startTime;
-  int runTime;
+  int pingDelay     = 300; // milliseconds between ping pulses  
+  int startTime; //Start time of first pulse
+  int runTime; //Total time of combined pulses
 
   //Temperature
   int tempRaw;
@@ -47,19 +41,19 @@ const int trigPin = 12; //Ultrasonic trigger, echo on pin 1 EXTI 1
   //Bluetooth
   unsigned long previous = 0;        // will store last time
   Uart Serial2 (&sercom1, 11, 10, SERCOM_RX_PAD_0, UART_TX_PAD_2); //bluetooth Module
+
   
 void SERCOM1_Handler()
 {
   Serial2.IrqHandler();
 }
+
  
 void setup() {
-  SerialUSB.begin(9600);
+  SerialUSB.begin(9600); //USB Comm. Diagnostisc purposes only. Not going to be in final version
   pinMode(LED,OUTPUT);
   pinMode(trigPin, OUTPUT);
   digitalWrite(trigPin, LOW);
-
-  PulseInOne::setup(pingReturn);
  
   Serial2.begin(57600); //baud rate for your bluetooth module
   
@@ -72,6 +66,7 @@ void setup() {
   delay(3000); // wait for settings to take affect. 
   
 }
+
  
 
 void loop() {
@@ -89,8 +84,7 @@ void loop() {
   if(pingTimer > pingDelay){  
     pingTimer = 0;
     ping();
-  } 
-
+    } 
 
   current = millis();
   
@@ -98,18 +92,16 @@ void loop() {
     
     tempRaw = analogRead(tempPin);
     volActual = analogRead(voltPin);
-    
+        
     previous = current;
-    //for distance test use durationRaw = durationRaw/29/2;
-    String data = String(durationRaw) + "," + String(tempRaw) + "," + String(volActual) + "," + String(runTime);
+    String data = String(runTime) + "," + String(tempRaw) + "," + String(volActual);
     Serial2.print(data); // print this to bluetooth module
-    SerialUSB.println(data);
-  }
-  
+    SerialUSB.println(data);  //USB Comm. Diagnostisc purposes only. Not going to be in final version
+    }  
 }
 
-void ping(){
 
+void ping(){
 
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
@@ -118,30 +110,21 @@ void ping(){
   int wait = 0;
   bool start = false;
 
-do{
+  do{
+      int pulseState = digitalRead(pulsePin);
 
-pulseState = digitalRead(pulsePin);
+      if ((pulseState == HIGH) && (start == false)) { //If first signal is recieved
+          start = true;
+          startTime = micros(); //Get start time      
+          }
+          
+      if ((pulseState == LOW) && (start ==true)) { //Counter to ensure signal is complete
+          wait++;
+          }
+          
+      if ((pulseState == HIGH) && (start ==true)){
+          runTime = micros()-startTime;  //calculate time changed
+          }
 
-if ((pulseState == HIGH) && (start == false)) {
-    start = true;
-    startTime = micros();
-  
-  }
-if ((pulseState == LOW) && (start ==true))
-{
-  wait++;
-}
-if ((pulseState == HIGH) && (start ==true)){
-  runTime = micros()-startTime;  
-}
-
-}while ( wait < 100);
-
-  
-
-//  PulseInOne::begin(); //Start listening on INT1
-}
-
-void pingReturn(unsigned long duration) {
-  durationRaw = duration;
+    }while ( wait < 700);
 }

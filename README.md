@@ -1,4 +1,10 @@
 # ECE4810 - Specific Gravity Sensor
+## V3.0
+Major Changes:
+* Removes PulseinZero() command
+* No longer uses echo pin on sensor
+* Removes all calculations from code. Will be done by the app
+
 ## V2.0
 Major Changes:
 * Removes Pulsein() command in exchange for hardware interupts
