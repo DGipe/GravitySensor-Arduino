@@ -19,6 +19,8 @@
 const int trigPin = 12; //Ultrasonic trigger, echo on pin 1 EXTI 1
   const int tempPin = 2; //LM35 input
   const int voltPin = 1; //Battery Monitoring
+
+  const int pulsePin = 9;
   
   //status light
   const int LED = 13;
@@ -30,6 +32,10 @@ const int trigPin = 12; //Ultrasonic trigger, echo on pin 1 EXTI 1
   unsigned long lastTime  = 0;
   int pingTimer     = 0;
   int pingDelay     = 300; // milliseconds between ping pulses
+  
+  int pulseState = 0;
+  int startTime;
+  int runTime;
 
   //Temperature
   int tempRaw;
@@ -95,7 +101,7 @@ void loop() {
     
     previous = current;
     //for distance test use durationRaw = durationRaw/29/2;
-    String data = String(durationRaw) + "," + String(tempRaw) + "," + String(volActual);
+    String data = String(durationRaw) + "," + String(tempRaw) + "," + String(volActual) + "," + String(runTime);
     Serial2.print(data); // print this to bluetooth module
     SerialUSB.println(data);
   }
@@ -109,7 +115,31 @@ void ping(){
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
 
-  PulseInOne::begin(); //Start listening on INT1
+  int wait = 0;
+  bool start = false;
+
+do{
+
+pulseState = digitalRead(pulsePin);
+
+if ((pulseState == HIGH) && (start == false)) {
+    start = true;
+    startTime = micros();
+  
+  }
+if ((pulseState == LOW) && (start ==true))
+{
+  wait++;
+}
+if ((pulseState == HIGH) && (start ==true)){
+  runTime = micros()-startTime;  
+}
+
+}while ( wait < 100);
+
+  
+
+//  PulseInOne::begin(); //Start listening on INT1
 }
 
 void pingReturn(unsigned long duration) {
